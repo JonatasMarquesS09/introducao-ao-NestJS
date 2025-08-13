@@ -9,13 +9,14 @@ import {
     UploadedFiles,
     UseInterceptors,
     BadRequestException,
+    Query,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { PlaceService } from './place.service';
 import { CloudinaryService } from './cloudinary.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { File as MulterFile } from 'multer';
-import { ApiBody, ApiConsumes, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 
 @Controller('places')
@@ -30,50 +31,63 @@ export class PlaceController {
         return this.placeService.findAll();
     }
 
-    @Post()
-    @UseInterceptors(FileFieldsInterceptor([{ name: 'images', maxCount: 3 }]))
-    @ApiConsumes('multipart/form-data')
-    @ApiOperation({ summary: 'Cadastrar novo local' })
-    @ApiBody({
-        description: 'Formulário com os dados do local + imagens',
-        schema: {
-            type: 'object',
-            required: ['name', 'type', 'phone', 'latitude', 'longitude', 'images'],
-            properties: {
-                name: { type: 'string', example: 'Praça Central' },
-                type: { type: 'string', enum: ['RESTAURANTE', 'BAR', 'HOTEL'] },
-                phone: { type: 'string', example: '(88) 99999-9999' },
-                latitude: { type: 'number', example: -3.7327 },
-                longitude: { type: 'number', example: -38.5267 },
-                images: {
-                    type: 'array',
-                    items: {
-                        type: 'string',
-                        format: 'binary',
-                    },
-                    description: 'Máximo de 3 imagens',
-                },
-            },
-        },
-    })
-    @ApiResponse({ status: 201, description: 'Place criado com sucesso' })
-    async createPlace(
-        @Body() data: CreatePlaceDto,
-        @UploadedFiles() files: { images?: MulterFile[] },
-    ) {
-        if (!files.images || files.images.length === 0) {
-            throw new BadRequestException('Pelo menos uma imagem deve ser enviada.');
-        }
+    @Get('pagineted')
+    @ApiOperation({summary: "listar locais paginados"})
+    @ApiQuery({name: 'page', required: false, type: Number, example: 10})
+    @ApiQuery({name: "limit", required: false, type: Number, example: 10})
+    async findPaginated(@Query('page') page = 1, @Query('limit') limit = 10){
+        const parsePage = Math.max(1, Number(page))
+        const parseLimit = Math.min(50, Math.max(1, Number(limit)))
 
-        const imageUrls = await Promise.all(
-            files.images.map((file) => this.cloudinaryService.uploadImage(file.buffer)),
-        );
-
-        return this.placeService.create({
-            ...data,
-            images: imageUrls, // Aqui você injeta as URLs para salvar
-        });
+        return this.placeService.findPaginated(parsePage, parseLimit)
     }
+
+     @Post()
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'images', maxCount: 3 }]))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Cadastrar um novo local' })
+  @ApiResponse({ status: 201, description: 'Place criado com sucesso!' })
+  @ApiBody({
+    description: 'Formulário criação de Local',
+    schema: {
+      type: 'object',
+      required: ['name', 'type', 'phone', 'latitude', 'longitude', 'images'],
+      properties: {
+        name: { type: 'string', example: 'Praça Central' },
+        type: { type: 'string', enum: ['RESTAURANTE', 'BAR', 'HOTEL'] },
+        phone: { type: 'string', example: '(88) 99999-9999' },
+        latitude: { type: 'number', example: -3.7327 },
+        longitude: { type: 'number', example: -38.5267 },
+        images: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Máximo de 3 imagens',
+        },
+      },
+    },
+  })
+  async createPlace(
+    @Body() data: CreatePlaceDto,
+    @UploadedFiles() files: { images?: MulterFile[] },
+  ) {
+    if (!files.images || files.images.length === 0) {
+      throw new BadRequestException('Pelo menos uma imagem deve ser enviada');
+    }
+
+    const imagesUrls = await Promise.all(
+      files.images.map((file) =>
+        this.cloudinaryService.uploadImage(file.buffer),
+      ),
+    );
+
+    return this.placeService.create({
+      ...data,
+      images: imagesUrls,
+    });
+  }
 
     @Put(':id')
     @UseInterceptors(FileFieldsInterceptor([{ name: 'images', maxCount: 3 }]))
