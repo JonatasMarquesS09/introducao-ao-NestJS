@@ -15,7 +15,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { PlaceService } from './place.service';
 import { CloudinaryService } from './cloudinary.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
-import { File as MulterFile } from 'multer';
+import { Express } from 'express';
 import { ApiBody, ApiConsumes, ApiResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 
@@ -71,7 +71,7 @@ export class PlaceController {
   })
   async createPlace(
     @Body() data: CreatePlaceDto,
-    @UploadedFiles() files: { images?: MulterFile[] },
+    @UploadedFiles() files: { images?: Express.Multer.File[] },
   ) {
     if (!files.images || files.images.length === 0) {
       throw new BadRequestException('Pelo menos uma imagem deve ser enviada');
@@ -118,7 +118,7 @@ export class PlaceController {
     async updatePlace(
         @Param('id') id: string,
         @Body() data: UpdatePlaceDto,
-        @UploadedFiles() files: { images?: MulterFile[] },
+        @UploadedFiles() files: { images?: Express.Multer.File[] },
     ) {
         const newImages = files.images?.map(file => file.buffer);
         return this.placeService.update(id, data, newImages);
